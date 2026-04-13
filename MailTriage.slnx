@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MailTriage.Api/MailTriage.Api.csproj" />
+    <Project Path="src/MailTriage.Core/MailTriage.Core.csproj" />
+    <Project Path="src/MailTriage.Infrastructure/MailTriage.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MailTriage.Tests/MailTriage.Tests.csproj" />
+  </Folder>
+</Solution>
