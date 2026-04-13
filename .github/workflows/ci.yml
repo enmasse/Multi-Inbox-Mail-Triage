@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "copilot/**" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      # Cache NuGet packages to speed up subsequent runs
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.slnx') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore MailTriage.slnx
+
+      - name: Build
+        run: dotnet build MailTriage.slnx --configuration Release --no-restore
+
+      # ── Unit Tests ────────────────────────────────────────────────────────
+      - name: Run unit tests
+        run: |
+          dotnet test tests/MailTriage.Tests/MailTriage.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=unit-test-results.trx" \
+            --results-directory ./test-results/unit
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ./test-results/unit/*.trx
+
+      # ── Integration Tests (Testcontainers + WebApplicationFactory) ───────
+      # Docker is available on ubuntu-latest; Testcontainers uses it to spin
+      # up the GreenMail IMAP/SMTP container.  The Aspire smoke test skips
+      # gracefully when the DCP runtime cannot start.
+      - name: Run integration tests
+        run: |
+          dotnet test tests/MailTriage.IntegrationTests/MailTriage.IntegrationTests.csproj \
+            --configuration Release \
+            --no-build \
+            --verbosity normal \
+            --logger "trx;LogFileName=integration-test-results.trx" \
+            --results-directory ./test-results/integration
+        env:
+          # Ensure Testcontainers can reach the Docker daemon
+          DOCKER_HOST: unix:///var/run/docker.sock
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: ./test-results/integration/*.trx
