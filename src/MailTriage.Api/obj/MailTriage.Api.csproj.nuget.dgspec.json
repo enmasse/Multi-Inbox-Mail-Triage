@@ -10,7 +10,7 @@
         "projectUniqueName": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Api/MailTriage.Api.csproj",
         "projectName": "MailTriage.Api",
         "projectPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Api/MailTriage.Api.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
+        "packagesPath": "/tmp/codeql-scratch-d8f0e64c22eadbcf/dbs/csharp/working/packages",
         "outputPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Api/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -52,6 +52,8 @@
           "targetAlias": "net9.0",
           "dependencies": {
             "Microsoft.EntityFrameworkCore.Design": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
               "target": "Package",
               "version": "[9.0.4, )"
             },
@@ -71,6 +73,20 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.linux-x64",
+              "version": "[9.0.14, 9.0.14]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.AspNetCore.App": {
               "privateAssets": "none"
@@ -89,7 +105,7 @@
         "projectUniqueName": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Core/MailTriage.Core.csproj",
         "projectName": "MailTriage.Core",
         "projectPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Core/MailTriage.Core.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
+        "packagesPath": "/tmp/codeql-scratch-d8f0e64c22eadbcf/dbs/csharp/working/packages",
         "outputPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Core/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -123,6 +139,10 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "dependencies": {
+            "MailKit": {
+              "target": "Package",
+              "version": "[4.15.1, )"
+            },
             "Microsoft.Extensions.Logging.Abstractions": {
               "target": "Package",
               "version": "[9.0.4, )"
@@ -139,6 +159,16 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
@@ -154,7 +184,7 @@
         "projectUniqueName": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Infrastructure/MailTriage.Infrastructure.csproj",
         "projectName": "MailTriage.Infrastructure",
         "projectPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Infrastructure/MailTriage.Infrastructure.csproj",
-        "packagesPath": "/home/runner/.nuget/packages/",
+        "packagesPath": "/tmp/codeql-scratch-d8f0e64c22eadbcf/dbs/csharp/working/packages",
         "outputPath": "/home/runner/work/Multi-Inbox-Mail-Triage/Multi-Inbox-Mail-Triage/src/MailTriage.Infrastructure/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -218,6 +248,16 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Ref",
+              "version": "[9.0.14, 9.0.14]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
