@@ -37,7 +37,8 @@ public static class ServiceCollectionExtensions
             var options = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl);
         });
-        services.AddScoped<ITriageService, OllamaTriageService>();
+        // Delegate to the typed client registration so the configured HttpClient is used.
+        services.AddTransient<ITriageService>(sp => sp.GetRequiredService<OllamaTriageService>());
 
         return services;
     }

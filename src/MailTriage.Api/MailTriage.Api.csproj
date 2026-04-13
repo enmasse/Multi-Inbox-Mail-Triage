@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MailTriage.Core\MailTriage.Core.csproj" />
     <ProjectReference Include="..\MailTriage.Infrastructure\MailTriage.Infrastructure.csproj" />
+    <ProjectReference Include="..\MailTriage.ServiceDefaults\MailTriage.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
