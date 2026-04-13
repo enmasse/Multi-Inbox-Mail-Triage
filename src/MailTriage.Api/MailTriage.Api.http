@@ -1,6 +1,27 @@
 @MailTriage.Api_HostAddress = http://localhost:5093
 
-GET {{MailTriage.Api_HostAddress}}/weatherforecast/
+GET {{MailTriage.Api_HostAddress}}/api/accounts
 Accept: application/json
+
+###
+
+GET {{MailTriage.Api_HostAddress}}/api/emails
+Accept: application/json
+
+###
+
+GET {{MailTriage.Api_HostAddress}}/api/rules
+Accept: application/json
+
+###
+
+POST {{MailTriage.Api_HostAddress}}/api/triage
+Content-Type: application/json
+
+{
+  "subject": "Test email subject",
+  "fromAddress": "sender@example.com",
+  "bodyText": "This is a test email body for manual triage."
+}
 
 ###

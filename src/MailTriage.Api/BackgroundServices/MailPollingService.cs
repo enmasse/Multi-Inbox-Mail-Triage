@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MailTriage.Core.Interfaces;
+using MailTriage.Core.Models;
 
 namespace MailTriage.Api.BackgroundServices;
 
@@ -31,13 +32,16 @@ public class MailPollingService : BackgroundService
     {
         try
         {
-            using var scope = _scopeFactory.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEmailRepository>();
-            var accounts = await repository.GetMailAccountsAsync(cancellationToken);
+            IReadOnlyList<MailAccount> accounts;
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var repository = scope.ServiceProvider.GetRequiredService<IEmailRepository>();
+                accounts = await repository.GetMailAccountsAsync(cancellationToken);
+            }
 
             _logger.LogDebug("Polling {Count} accounts", accounts.Count);
 
-            var tasks = accounts.Select(account => PollAccountSafeAsync(scope, account.Id, cancellationToken));
+            var tasks = accounts.Select(account => PollAccountSafeAsync(account.Id, cancellationToken));
             await Task.WhenAll(tasks);
         }
         catch (OperationCanceledException) { }
@@ -47,10 +51,11 @@ public class MailPollingService : BackgroundService
         }
     }
 
-    private async Task PollAccountSafeAsync(IServiceScope scope, int accountId, CancellationToken cancellationToken)
+    private async Task PollAccountSafeAsync(int accountId, CancellationToken cancellationToken)
     {
         try
         {
+            using var scope = _scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IEmailRepository>();
             var account = await repository.GetMailAccountAsync(accountId, cancellationToken);
             if (account == null || !account.IsEnabled) return;
