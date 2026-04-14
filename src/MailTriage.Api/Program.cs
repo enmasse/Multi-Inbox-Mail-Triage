@@ -1,9 +1,11 @@
+using MailTriage.Api.Auth;
 using MailTriage.Api.BackgroundServices;
 using MailTriage.Api.Services;
 using MailTriage.Core.Interfaces;
 using MailTriage.Infrastructure;
 using MailTriage.Infrastructure.Data;
 using MailTriage.Infrastructure.Llm;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -30,6 +32,13 @@ builder.Services.AddSingleton<IPollingStateStore, PollingStateStore>();
 // Dependency health cache — singleton that caches DB and Ollama connectivity checks.
 builder.Services.AddSingleton<DependencyHealthService>();
 
+// Pairing-token authentication
+builder.Services.Configure<PairingTokenOptions>(builder.Configuration.GetSection("PairingToken"));
+builder.Services.AddSingleton<IPairingTokenService, PairingTokenService>();
+builder.Services.AddAuthentication("PairingToken")
+    .AddScheme<AuthenticationSchemeOptions, PairingTokenAuthHandler>("PairingToken", null);
+builder.Services.AddAuthorization();
+
 // Background polling service
 builder.Services.AddHostedService<MailPollingService>();
 
@@ -43,6 +52,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.MapDefaultEndpoints();
 

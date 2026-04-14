@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using MailTriage.Api.Services;
 using MailTriage.Core.Interfaces;
 using MailTriage.Core.Models;
+using System.Diagnostics;
 
 namespace MailTriage.Api.BackgroundServices;
 
@@ -12,15 +13,18 @@ public class MailPollingService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MailPollingService> _logger;
     private readonly IPollingStateStore _pollingStateStore;
+    private readonly IMailTriageMetrics _metrics;
 
     public MailPollingService(
         IServiceScopeFactory scopeFactory,
         ILogger<MailPollingService> logger,
-        IPollingStateStore pollingStateStore)
+        IPollingStateStore pollingStateStore,
+        IMailTriageMetrics metrics)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
         _pollingStateStore = pollingStateStore;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,6 +49,8 @@ public class MailPollingService : BackgroundService
 
     private async Task PollAllAccountsAsync(CancellationToken cancellationToken)
     {
+        var sw = Stopwatch.StartNew();
+        var success = false;
         try
         {
             IReadOnlyList<MailAccount> accounts;
@@ -58,11 +64,18 @@ public class MailPollingService : BackgroundService
 
             var tasks = accounts.Select(account => PollAccountSafeAsync(account, cancellationToken));
             await Task.WhenAll(tasks);
+            success = true;
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during mail polling cycle");
+        }
+        finally
+        {
+            sw.Stop();
+            if (!cancellationToken.IsCancellationRequested)
+                _metrics.RecordPollRun(success, sw.Elapsed.TotalSeconds);
         }
     }
 
