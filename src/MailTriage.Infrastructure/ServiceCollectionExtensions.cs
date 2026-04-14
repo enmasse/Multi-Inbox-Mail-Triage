@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MailTriage.Core.Interfaces;
+using MailTriage.Core.Metrics;
 using MailTriage.Infrastructure.Data;
 using MailTriage.Infrastructure.Imap;
 using MailTriage.Infrastructure.Llm;
@@ -14,6 +15,9 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        // Metrics (singleton – shared across the whole process lifetime)
+        services.AddSingleton<IMailTriageMetrics, MailTriageMetrics>();
+
         // SQLite via EF Core
         var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "Data Source=mailtriage.db";
         services.AddDbContext<MailTriageDbContext>(options =>

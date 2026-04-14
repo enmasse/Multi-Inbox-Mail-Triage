@@ -10,6 +10,7 @@ using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
 using MailTriage.Core.Interfaces;
+using MailTriage.Core.Metrics;
 using MailTriage.Core.Models;
 using MailTriage.Infrastructure.Data;
 using MailTriage.Infrastructure.Imap;
@@ -126,7 +127,8 @@ public class MailFlowIntegrationTests : IDisposable
             _repository,
             triageService,
             forwarder ?? new NoOpEmailForwarder(),
-            NullLogger<ImapMailMonitorService>.Instance);
+            NullLogger<ImapMailMonitorService>.Instance,
+            new MailTriageMetrics());
     }
 
     [Fact]
