@@ -11,6 +11,7 @@ An autonomous, agentic mail triaging service written in C# (.NET 9). It monitors
 - **SQLite persistence** – all accounts, triaged emails, and forwarding rules are stored in a local SQLite database via EF Core.
 - **Forwarding rules** – automatically forward emails to specified addresses based on category, priority, sender pattern, or subject pattern.
 - **REST API** – full HTTP API for managing accounts, viewing triaged emails, and configuring forwarding rules.
+- **Pairing-token auth** – lightweight bearer-token authentication protects all data endpoints; a localhost-only provisioning endpoint issues tokens.
 - **Autonomous background service** – runs as a long-lived ASP.NET Core hosted service with configurable polling intervals.
 
 ---
@@ -29,11 +30,13 @@ src/
     Llm/                      # Ollama HTTP client triage service
 
   MailTriage.Api/             # ASP.NET Core host
+    Auth/                     # Pairing-token auth (handler, service, options)
     BackgroundServices/       # MailPollingService (IHostedService)
-    Controllers/              # AccountsController, EmailsController, RulesController, TriageController
+    Controllers/              # AccountsController, EmailsController, RulesController, TriageController, PairingController
 
 tests/
-  MailTriage.Tests/           # xUnit tests (27 tests)
+  MailTriage.Tests/           # xUnit unit tests (39 tests)
+  MailTriage.IntegrationTests/ # Integration tests incl. auth (30 tests)
 ```
 
 ---
@@ -100,6 +103,32 @@ The service starts on `http://localhost:5000` (and `https://localhost:5001`). Th
 
 ---
 
+## Authentication
+
+All data endpoints (`/api/accounts`, `/api/emails`, `/api/rules`, `/api/triage`) require a
+valid bearer token. Health endpoints (`/health`, `/alive`) are public.
+
+### Provisioning a token
+
+The provisioning endpoint is public but only accessible from localhost:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:5093/api/pairing/token | jq -r '.token')
+```
+
+### Using the token
+
+Pass it in the `Authorization` header for all subsequent requests:
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" http://localhost:5093/api/accounts
+```
+
+Tokens are valid for 24 hours by default. See [`docs/pairing-token-auth.md`](docs/pairing-token-auth.md)
+for the full design, configuration reference, and security notes.
+
+---
+
 ## REST API
 
 ### Mail Accounts
@@ -114,7 +143,8 @@ The service starts on `http://localhost:5000` (and `https://localhost:5001`). Th
 
 **Add account example:**
 ```bash
-curl -X POST http://localhost:5000/api/accounts \
+curl -X POST http://localhost:5093/api/accounts \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Work Gmail",
@@ -138,7 +168,8 @@ Query parameters: `accountId`, `category`, `minPriority`, `skip`, `take` (max 20
 
 ```bash
 # Get urgent action-required emails
-curl "http://localhost:5000/api/emails?category=ActionRequired&minPriority=High"
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5093/api/emails?category=ActionRequired&minPriority=High"
 ```
 
 ### Forwarding Rules
@@ -151,7 +182,8 @@ curl "http://localhost:5000/api/emails?category=ActionRequired&minPriority=High"
 
 **Create rule example:**
 ```bash
-curl -X POST http://localhost:5000/api/rules \
+curl -X POST http://localhost:5093/api/rules \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Forward Urgent",
@@ -164,7 +196,8 @@ curl -X POST http://localhost:5000/api/rules \
 ### Manual Triage (for testing)
 
 ```bash
-curl -X POST http://localhost:5000/api/triage \
+curl -X POST http://localhost:5093/api/triage \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "subject": "Invoice #1234 due tomorrow",
@@ -205,11 +238,15 @@ curl -X POST http://localhost:5000/api/triage \
 dotnet test MailTriage.slnx
 ```
 
-27 tests covering:
+69 tests covering:
+- Pairing token service (issue, validate, expiry, initial token)
 - Email repository CRUD and filtering
 - Ollama triage service (JSON parsing, fallback, markdown handling, body truncation)
 - IMAP monitor resilience (connection failures)
 - Domain model defaults and enum semantics
+- Integration: all protected endpoints return 401/403 without a valid token
+- Integration: provisioned token grants access to protected endpoints
+- Integration: health endpoints are always public
 
 ---
 
@@ -225,6 +262,9 @@ dotnet test MailTriage.slnx
 | `Smtp` | `Port` | `587` | SMTP port |
 | `Smtp` | `UseSsl` | `false` | Use SSL/TLS directly (vs STARTTLS) |
 | `Smtp` | `FromAddress` | *(empty)* | From address for forwarded emails |
+| `PairingToken` | `TokenExpiryHours` | `24` | Token lifetime in hours |
+| `PairingToken` | `RequireLocalhostForProvisioning` | `true` | Restrict provisioning to localhost |
+| `PairingToken` | `InitialToken` | *(empty)* | Pre-seeded bootstrap token (use secrets management) |
 
 ---
 
