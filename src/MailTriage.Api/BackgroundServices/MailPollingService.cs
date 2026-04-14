@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using MailTriage.Api.Services;
 using MailTriage.Core.Interfaces;
 using MailTriage.Core.Models;
 
@@ -10,21 +11,35 @@ public class MailPollingService : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MailPollingService> _logger;
+    private readonly IPollingStateStore _pollingStateStore;
 
-    public MailPollingService(IServiceScopeFactory scopeFactory, ILogger<MailPollingService> logger)
+    public MailPollingService(
+        IServiceScopeFactory scopeFactory,
+        ILogger<MailPollingService> logger,
+        IPollingStateStore pollingStateStore)
     {
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _pollingStateStore = pollingStateStore;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Mail polling service started");
+        _pollingStateStore.SetRunning(true);
 
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            await PollAllAccountsAsync(stoppingToken);
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                await PollAllAccountsAsync(stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _pollingStateStore.SetRunning(false);
+            _logger.LogInformation("Mail polling service stopped");
         }
     }
 
@@ -41,7 +56,7 @@ public class MailPollingService : BackgroundService
 
             _logger.LogDebug("Polling {Count} accounts", accounts.Count);
 
-            var tasks = accounts.Select(account => PollAccountSafeAsync(account.Id, cancellationToken));
+            var tasks = accounts.Select(account => PollAccountSafeAsync(account, cancellationToken));
             await Task.WhenAll(tasks);
         }
         catch (OperationCanceledException) { }
@@ -51,24 +66,32 @@ public class MailPollingService : BackgroundService
         }
     }
 
-    private async Task PollAccountSafeAsync(int accountId, CancellationToken cancellationToken)
+    private async Task PollAccountSafeAsync(MailAccount account, CancellationToken cancellationToken)
     {
+        _pollingStateStore.RecordPollStart(account.Id, account.IsEnabled, account.Mailbox);
         try
         {
-            using var scope = _scopeFactory.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IEmailRepository>();
-            var account = await repository.GetMailAccountAsync(accountId, cancellationToken);
-            if (account == null || !account.IsEnabled) return;
+            if (!account.IsEnabled)
+            {
+                _pollingStateStore.RecordPollSuccess(account.Id);
+                return;
+            }
 
+            using var scope = _scopeFactory.CreateScope();
             var monitor = scope.ServiceProvider.GetRequiredService<IMailMonitorService>();
             var results = await monitor.PollAccountAsync(account, cancellationToken);
+
+            var lastMessageId = results.Count > 0 ? results[^1].MessageId : null;
+            _pollingStateStore.RecordPollSuccess(account.Id, lastMessageId);
+
             if (results.Count > 0)
                 _logger.LogInformation("Account {Name}: processed {Count} new emails", account.Name, results.Count);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error polling account ID {AccountId}", accountId);
+            _logger.LogError(ex, "Error polling account ID {AccountId}", account.Id);
+            _pollingStateStore.RecordPollFailure(account.Id, ex.Message);
         }
     }
 }
