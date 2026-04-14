@@ -8,17 +8,28 @@ namespace MailTriage.Api.Controllers;
 public class TriageController : ControllerBase
 {
     private readonly ITriageService _triageService;
+    private readonly IMailTriageMetrics _metrics;
 
-    public TriageController(ITriageService triageService)
+    public TriageController(ITriageService triageService, IMailTriageMetrics metrics)
     {
         _triageService = triageService;
+        _metrics = metrics;
     }
 
     [HttpPost]
     public async Task<IActionResult> TriageEmail([FromBody] ManualTriageRequest request, CancellationToken cancellationToken)
     {
-        var result = await _triageService.TriageEmailAsync(request.Subject, request.FromAddress, request.BodyText, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _triageService.TriageEmailAsync(request.Subject, request.FromAddress, request.BodyText, cancellationToken);
+            _metrics.RecordTriageRequest(true);
+            return Ok(result);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _metrics.RecordTriageRequest(false);
+            throw;
+        }
     }
 }
 
