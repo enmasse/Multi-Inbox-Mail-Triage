@@ -1,6 +1,8 @@
+using MailTriage.Api.Auth;
 using MailTriage.Api.BackgroundServices;
 using MailTriage.Infrastructure;
 using MailTriage.Infrastructure.Data;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +15,13 @@ builder.Services.AddEndpointsApiExplorer();
 
 // Infrastructure (IMAP, SQLite, Ollama, SMTP)
 builder.Services.AddMailTriageInfrastructure(builder.Configuration);
+
+// Pairing-token authentication
+builder.Services.Configure<PairingTokenOptions>(builder.Configuration.GetSection("PairingToken"));
+builder.Services.AddSingleton<IPairingTokenService, PairingTokenService>();
+builder.Services.AddAuthentication("PairingToken")
+    .AddScheme<AuthenticationSchemeOptions, PairingTokenAuthHandler>("PairingToken", null);
+builder.Services.AddAuthorization();
 
 // Background polling service
 builder.Services.AddHostedService<MailPollingService>();
@@ -27,6 +36,8 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 app.MapDefaultEndpoints();
 
