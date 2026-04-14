@@ -32,11 +32,11 @@ src/
   MailTriage.Api/             # ASP.NET Core host
     Auth/                     # Pairing-token auth (handler, service, options)
     BackgroundServices/       # MailPollingService (IHostedService)
-    Controllers/              # AccountsController, EmailsController, RulesController, TriageController, PairingController
+    Controllers/              # AccountsController, EmailsController, RulesController, TriageController, MetricsController, PairingController
 
 tests/
-  MailTriage.Tests/           # xUnit unit tests (39 tests)
-  MailTriage.IntegrationTests/ # Integration tests incl. auth (30 tests)
+  MailTriage.Tests/           # xUnit unit tests
+  MailTriage.IntegrationTests/ # xUnit integration tests (requires Docker for mail-flow tests)
 ```
 
 ---
@@ -206,6 +206,33 @@ curl -X POST http://localhost:5093/api/triage \
   }'
 ```
 
+### Operational Metrics
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/metrics` | Prometheus-format operational metrics |
+
+The endpoint returns metrics in [Prometheus text format v0.0.4](https://prometheus.io/docs/instrumenting/exposition_formats/) with `Content-Type: text/plain; version=0.0.4; charset=utf-8`.
+
+**Example:**
+```bash
+curl http://localhost:5000/api/metrics
+```
+
+**Authentication:** The `/api/metrics` endpoint is intentionally unauthenticated so that Prometheus scrapers and monitoring tools can reach it without credentials. It does **not** emit PII; email addresses, subjects, and other user data are never used as label values.
+
+#### Metric reference
+
+| Metric name | Type | Labels | Description |
+|-------------|------|--------|-------------|
+| `mailtriage_poll_runs_total` | counter | `result="success"\|"failure"` | Total mail poll cycles executed |
+| `mailtriage_poll_duration_seconds` | histogram | — | Wall-clock duration of each poll cycle (buckets: 0.1 s … 60 s) |
+| `mailtriage_emails_processed_total` | counter | — | Total emails triaged by the polling service |
+| `mailtriage_triage_requests_total` | counter | `result="success"\|"failure"` | Total triage requests (automated polling + manual `/api/triage` calls) |
+| `mailtriage_forward_attempts_total` | counter | `result="success"\|"failure"` | Total SMTP forward attempts |
+
+> **Note on `mailtriage_triage_requests_total{result="failure"}`:** This counter increments only when the triage service throws an unhandled exception. `OllamaTriageService` is designed to degrade gracefully (returning `Unknown/Normal` on HTTP or parsing errors), so in practice most failures are recorded as `result="success"` with `Unknown` category rather than as counter failures.
+
 ---
 
 ## Triage Categories & Priorities
@@ -238,12 +265,14 @@ curl -X POST http://localhost:5093/api/triage \
 dotnet test MailTriage.slnx
 ```
 
-69 tests covering:
+Tests cover:
 - Pairing token service (issue, validate, expiry, initial token)
 - Email repository CRUD and filtering
 - Ollama triage service (JSON parsing, fallback, markdown handling, body truncation)
 - IMAP monitor resilience (connection failures)
 - Domain model defaults and enum semantics
+- `MailTriageMetrics` thread-safety and histogram correctness (16 tests)
+- `/api/metrics` endpoint: availability, Prometheus format, PII guard, counter increments (19 integration tests)
 - Integration: all protected endpoints return 401/403 without a valid token
 - Integration: provisioned token grants access to protected endpoints
 - Integration: health endpoints are always public

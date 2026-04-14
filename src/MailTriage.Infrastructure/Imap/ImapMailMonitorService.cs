@@ -16,19 +16,22 @@ public class ImapMailMonitorService : IMailMonitorService
     private readonly ITriageService _triageService;
     private readonly IEmailForwarder _forwarder;
     private readonly ILogger<ImapMailMonitorService> _logger;
+    private readonly IMailTriageMetrics _metrics;
 
     public ImapMailMonitorService(
         IImapClientFactory clientFactory,
         IEmailRepository repository,
         ITriageService triageService,
         IEmailForwarder forwarder,
-        ILogger<ImapMailMonitorService> logger)
+        ILogger<ImapMailMonitorService> logger,
+        IMailTriageMetrics metrics)
     {
         _clientFactory = clientFactory;
         _repository = repository;
         _triageService = triageService;
         _forwarder = forwarder;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public Task StartAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
@@ -68,11 +71,22 @@ public class ImapMailMonitorService : IMailMonitorService
                     }
 
                     var bodyText = message.TextBody ?? message.HtmlBody ?? string.Empty;
-                    var triageResult = await _triageService.TriageEmailAsync(
-                        message.Subject ?? string.Empty,
-                        message.From.ToString(),
-                        bodyText,
-                        cancellationToken);
+
+                    TriageResult triageResult;
+                    try
+                    {
+                        triageResult = await _triageService.TriageEmailAsync(
+                            message.Subject ?? string.Empty,
+                            message.From.ToString(),
+                            bodyText,
+                            cancellationToken);
+                        _metrics.RecordTriageRequest(true);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _metrics.RecordTriageRequest(false);
+                        throw;
+                    }
 
                     var toAddresses = message.To.Select(a => a.ToString()).ToList();
                     var triaged = new TriagedEmail
@@ -96,6 +110,7 @@ public class ImapMailMonitorService : IMailMonitorService
                     };
 
                     await _repository.SaveTriagedEmailAsync(triaged, cancellationToken);
+                    _metrics.RecordEmailProcessed();
 
                     // Apply forwarding rules
                     var rules = await _repository.GetForwardingRulesAsync(cancellationToken);
@@ -105,6 +120,7 @@ public class ImapMailMonitorService : IMailMonitorService
                         {
                             _logger.LogInformation("Forwarding email {Subject} to {Address} per rule {Rule}", triaged.Subject, rule.ForwardToAddress, rule.Name);
                             var forwarded = await _forwarder.ForwardEmailAsync(triaged, rule.ForwardToAddress, cancellationToken);
+                            _metrics.RecordForwardAttempt(forwarded);
                             if (forwarded && !triaged.IsForwarded)
                             {
                                 triaged.IsForwarded = true;

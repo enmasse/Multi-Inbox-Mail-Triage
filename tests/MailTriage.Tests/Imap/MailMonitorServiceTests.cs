@@ -2,6 +2,7 @@ using FluentAssertions;
 using Moq;
 using Microsoft.Extensions.Logging.Abstractions;
 using MailTriage.Core.Interfaces;
+using MailTriage.Core.Metrics;
 using MailTriage.Core.Models;
 using MailTriage.Infrastructure.Imap;
 
@@ -13,6 +14,7 @@ public class MailMonitorServiceTests
     private readonly Mock<IEmailRepository> _mockRepository;
     private readonly Mock<ITriageService> _mockTriageService;
     private readonly Mock<IEmailForwarder> _mockForwarder;
+    private readonly Mock<IMailTriageMetrics> _mockMetrics;
     private readonly ImapMailMonitorService _service;
 
     public MailMonitorServiceTests()
@@ -21,13 +23,15 @@ public class MailMonitorServiceTests
         _mockRepository = new Mock<IEmailRepository>();
         _mockTriageService = new Mock<ITriageService>();
         _mockForwarder = new Mock<IEmailForwarder>();
+        _mockMetrics = new Mock<IMailTriageMetrics>();
 
         _service = new ImapMailMonitorService(
             _mockClientFactory.Object,
             _mockRepository.Object,
             _mockTriageService.Object,
             _mockForwarder.Object,
-            NullLogger<ImapMailMonitorService>.Instance);
+            NullLogger<ImapMailMonitorService>.Instance,
+            _mockMetrics.Object);
     }
 
     [Fact]
