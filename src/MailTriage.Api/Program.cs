@@ -1,6 +1,9 @@
 using MailTriage.Api.BackgroundServices;
+using MailTriage.Api.Services;
+using MailTriage.Core.Interfaces;
 using MailTriage.Infrastructure;
 using MailTriage.Infrastructure.Data;
+using MailTriage.Infrastructure.Llm;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,6 +16,19 @@ builder.Services.AddEndpointsApiExplorer();
 
 // Infrastructure (IMAP, SQLite, Ollama, SMTP)
 builder.Services.AddMailTriageInfrastructure(builder.Configuration);
+
+// Named HTTP client used exclusively by DependencyHealthService for Ollama health probes.
+builder.Services.AddHttpClient("OllamaHealth", (sp, client) =>
+{
+    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<OllamaOptions>>().Value;
+    client.BaseAddress = new Uri(opts.BaseUrl);
+});
+
+// Polling state store — singleton shared between MailPollingService and StatusController.
+builder.Services.AddSingleton<IPollingStateStore, PollingStateStore>();
+
+// Dependency health cache — singleton that caches DB and Ollama connectivity checks.
+builder.Services.AddSingleton<DependencyHealthService>();
 
 // Background polling service
 builder.Services.AddHostedService<MailPollingService>();
