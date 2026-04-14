@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using WireMock.RequestBuilders;
 using WireMock.ResponseBuilders;
 using WireMock.Server;
+using MailTriage.Api.Auth;
 using MailTriage.Api.BackgroundServices;
 using MailTriage.Core.Models;
 using MailTriage.Infrastructure.Data;
@@ -29,6 +30,12 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
 
     /// <summary>WireMock server standing in for Ollama. Tests configure stubs here.</summary>
     public WireMockServer WireMock { get; } = WireMockServer.Start();
+
+    /// <summary>
+    /// A pre-seeded bearer token that is valid for all requests in tests.
+    /// Use <see cref="CreateAuthenticatedClient"/> to get a client that sends this token.
+    /// </summary>
+    public const string TestBearerToken = "integration-test-token-abc123xyz";
 
     public ApiWebApplicationFactory()
     {
@@ -68,7 +75,27 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
             var polling = services.SingleOrDefault(
                 d => d.ImplementationType == typeof(MailPollingService));
             if (polling != null) services.Remove(polling);
+
+            // Pre-seed the test bearer token and disable localhost restriction for provisioning.
+            services.Configure<PairingTokenOptions>(o =>
+            {
+                o.InitialToken = TestBearerToken;
+                o.RequireLocalhostForProvisioning = false;
+            });
         });
+    }
+
+    /// <summary>
+    /// Creates an <see cref="HttpClient"/> with the <see cref="TestBearerToken"/> already
+    /// set in the <c>Authorization</c> header. Use this for tests that exercise protected
+    /// endpoints; the existing functionality tests do not need to concern themselves with auth.
+    /// </summary>
+    public HttpClient CreateAuthenticatedClient()
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TestBearerToken);
+        return client;
     }
 
     protected override void Dispose(bool disposing)
@@ -94,7 +121,9 @@ public class ApiIntegrationTests : IDisposable
     public ApiIntegrationTests()
     {
         _factory = new ApiWebApplicationFactory();
-        _client = _factory.CreateClient();
+        // Use an authenticated client so the existing functional tests still pass
+        // now that all data endpoints require a valid pairing token.
+        _client = _factory.CreateAuthenticatedClient();
     }
 
     public void Dispose()

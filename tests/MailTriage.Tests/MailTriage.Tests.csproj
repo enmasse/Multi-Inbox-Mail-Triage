@@ -24,6 +24,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\MailTriage.Core\MailTriage.Core.csproj" />
     <ProjectReference Include="..\..\src\MailTriage.Infrastructure\MailTriage.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MailTriage.Api\MailTriage.Api.csproj" />
   </ItemGroup>
 
 </Project>

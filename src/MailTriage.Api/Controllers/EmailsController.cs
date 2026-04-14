@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MailTriage.Core.Interfaces;
 using MailTriage.Core.Models;
@@ -6,6 +7,7 @@ namespace MailTriage.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class EmailsController : ControllerBase
 {
     private readonly IEmailRepository _repository;
